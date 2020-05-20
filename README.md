@@ -4,7 +4,7 @@ Author: Satria P. Sajuthi, Peter DeFord
 ---
 
 This repository contains scripts used to produce the figures within the paper "Type 2 and interferon inflammation strongly regulate SARS-CoV-2 related gene expression in the airway epithelium". They are organized as follow:
-1. [test] (Bulk RNA-seq analysis on GALA II) preliminary analyses.
+1. [Bulk RNA-seq analysis on GALA II](#Bulk-RNA-seq-analysis-on-GALA-II).
 2. main population analyses.
 3. population subset analyses. 
 4. scRNA.
