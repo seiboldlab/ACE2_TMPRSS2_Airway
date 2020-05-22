@@ -4,6 +4,7 @@ library(ggpubr)
 library(heatmap3)
 library(dendextend)
 library(ggbeeswarm)
+library(openxlsx)
 
 ### load normalized expression data
 vstMat <- read.table("695_expr_vst.txt", header=T, sep='\t', row.names=1)
@@ -151,5 +152,41 @@ TMPRSS2_L2FC <- log2(mean(dat[dat$type2_status=="type2_high", "TMPRSS2_norm"]) /
 # ACE2 expression based on interferon status #
 #============================================#
 
-# Peter could you add this section
+#==================================#
+# Distribution of detected viruses #
+#==================================#
+
 # Figure 4d
+##### Virus Finder Results #####
+virus_counts <- read.xlsx("DATA/vf2_new_merged_mas_edit_5.15.20.xlsx", rowNames=TRUE, sheet=1)
+exclude <- c("HR1872","HR1751","HR1801")
+virus_counts <- virus_counts[!rownames(virus_counts) %in% exclude,]
+
+# Convert old Donor IDs to new ones
+renames <- list(
+  HR5519 <- "HR5579",
+  HR1241 <- "SJ1241",
+  HR5125 <- "HR1212",
+  HR1251 <- "HR1250",
+  HR5398 <- "SJ5398"
+)
+oldnames <- rownames(virus_counts)
+for (name in names(renames)) {
+  if (name %in% oldnames){
+    rownames(virus_counts)[which(oldnames == name)] <- renames[[name]]
+  }
+}
+
+##### Put together pie chart of detected species
+virus_status_df <- data.frame(table(virus_counts$virus_new), stringsAsFactors=F)
+virus_status_df[,"Infection"] <- apply(virus_status_df, 1, function(x){sprintf("%s (%s)", x[1], x[2])})
+virus_status_df <- virus_status_df[order(virus_status_df$Freq, decreasing=T),]
+virus_status_df$labels <- rep("", nrow(virus_status_df))
+
+pdf("IMAGES/detectedViruses_pie.pdf", width=5, height=2.5)
+g <- ggpie(virus_status_df, x="Freq", 
+          label="labels", fill="Infection", lab.font=c(10,"bold",rgb(0,0,0,0)),
+          lab.pos=NULL, ) +
+    theme(legend.position="right") + theme(legend.title=element_blank())
+print(g)
+dev.off()
