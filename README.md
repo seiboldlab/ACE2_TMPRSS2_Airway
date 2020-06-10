@@ -23,10 +23,6 @@ The necessary packages to load can be found at the top of each script. We used R
 * [inVivo_virus_Diff_Gene_Expression.R](1_Analysis%20on%20GALAII%20cohort/4_inVivo_virus_Diff_Gene_Expression.R) - Performs differential expression analysis between virus infected individuals and uninfected individuals for two sets of viruses:
   * Human coronaviruses
   * Pooled human rhinovirus C, Influenza A, Influenza B, Orthopneumovirus, Metapneumovirus, Enterovirus, and Parainfluenza.
-* [IPA_virus_expression.R](1_Analysis%20on%20GALAII%20cohort/5_IPA_virus_expression.R) - Compiles the output of IPA to produce a heatmap comparing the expression of canonical cytotoxic pathways in the two groups of virus infected individuals.
-* [viral_GSEA.R](1_Analysis%20on%20GALAII%20cohort/6_viral_GSEA.R) - Performs Gene Set Enrichment Analysis of the differntially expressed genes that are specific to each group of viruses, or the shared DEGs.
-  * Rank orders genes based on the relative expression in immune cell types vs other immune cells.
-  * GSEA of Shared DEGs, CoV+ specific DEGs, or DEGs specific to the other viruses on these pre-ranked gene sets.
 
 ## __Analysis of scRNA-seq data from the nasal epithelial brushing__
 * [Nasal_brush_10X_analysis.R](2_Nasal_brush_scRNA-seq/Nasal_brush_10X_analysis.R) - carries out analyses on the nasal brushing 10X scRNA-seq data including clustering, UMAP visualization of cell populations (Fig 1a), find marker genes among cell populations, violin plots of ACE2 and TMPRSS2 (Fig. 1b-c) 
