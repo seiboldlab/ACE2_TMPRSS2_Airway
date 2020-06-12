@@ -7,7 +7,8 @@ between CoV+ and Severe+ each vs. uninfected individuals.
 INPUTS:
 - Phenotype data to use as covariates
 - Raw count matrix
-- Virus Finder results by Virus type
+- VST normalized count matrix
+- Virus Identification Pipeline results by Virus type
 - WGCNA module eigengenes
 - WGCNA module assignments by gene
 
@@ -15,18 +16,18 @@ OUTPUTS:
 - Limma results for CoV+ vs Uninfected (Corona_v_uninfected.DEG.txt)
 - Limma results for Severe+ vs Uninfected (Severe_v_uninfected.DEG.txt)
 - Combined differential expression results (COV_Severe_Combined_DEGs.txt)
+- DEG list with annotation of which infection group genes were significant
+  (Combined_sigDEGs.txt)
 - Panels for Figure 6:
   - Tan module eigengenes by infection status:
     Fig6A_tan_eigen_byInfection.pd
   - Purple module eigengenes by infection status:
     Fig6B_purple_eigen_byInfection.pdf
-  - Venn diagram of differentially expressed genes in the two viruses:
-    Fig6c_DEG_Venn.pdf
-  - Enrichment terms for the shared DEGs:
-    Fig6c_enrich_terms.pdf
-- Supplementary Figure 5
-  - Scatter plot of the logFC in Severe vs in CoV:
-    SFig5_CoV_Severe_logFC.pdf
+  - Scatterplot of differentially expressed genes in the two viruses:
+    Fig6c_Severe_logFC_comp.pdf
+  - Enrichment terms for shared genes, from Fig 6C:
+    bothup_top_enrichr_Severe.txt
+    bothdn_top_enrichr_Severe.txt
 - Enrichment scores for upregulated DEGs in the purple and tan modules:
     (CoV_Severe_DEG_WGCNA_enrichment.txt)
 "
@@ -49,6 +50,9 @@ rownames(phen) = phen$SubjectID
 
 ##### Raw expression count matrix #####
 counts = read.table("/Seibold/proj/GALA_720donors/ANALYSIS_FIXED_PHENO/TABLES/695_raw_counts.txt", sep='\t', header=T, strings=F, row.names=1)
+
+##### Normalized expression data #####
+vst = read.table("/Seibold/proj/GALA_720donors/ANALYSIS_FIXED_PHENO/TABLES/695_expr_vst.txt", sep='\t', header=T, strings=F, row.names=1)
 
 ##### Virus Finder Results #####
 virus_counts = read.xlsx("DATA/vf2_new_merged_mas_edit_5.15.20.xlsx", rowNames=TRUE, sheet=1)
@@ -188,6 +192,18 @@ colnames(common_res_Severe) = c("logFC_CoV", "AveExpr_CoV", "adj.P.Val_CoV", "lo
 write.table(common_res_Severe, file="./OUTPUT/COV_Severe_Combined_DEGs.txt", sep='\t', quote=F, col.names=NA)
 
 
+#### Create DEG table for the supplement
+sig_cov = common_res_Severe$adj.P.Val_CoV < 0.05 & abs(common_res_Severe$logFC_CoV) > 0.5
+sig_other = common_res_Severe$adj.P.Val_Severe < 0.05 & abs(common_res_Severe$logFC_Severe) > 0.5
+sig_status = ifelse(sig_cov & sig_other, "Both",
+             ifelse(sig_cov, "CoV",
+             ifelse(sig_other, "ORV", "Neither")))
+common_res_sig = common_res_Severe[sig_cov | sig_other,]
+common_res_sig$Significance = sig_status[sig_cov | sig_other]
+common_res_sig = common_res_sig[order(common_res_sig$Significance, common_res_sig$adj.P.Val_CoV),]
+colnames(common_res_sig) = c("logFC_CoV", "AveExpr_CoV", "adj.P.Val_CoV", "logFC_Other", "AveExpr_Other", "adj.P.Val_Other", "Significance")
+write.table(common_res_sig, file="./OUTPUT/Combined_sigDEGs.txt", sep="\t", quote=F, col.names=NA)
+
 ##### Identify significant DEGs ####
 # FDR of 0.05 and absolute logFC of 0.5
 CoV_degs = rownames(res_fit_CoV[(res_fit_CoV$adj.P.Val < 0.05) & (abs(res_fit_CoV$logFC) > 0.5),])
@@ -274,11 +290,27 @@ ggboxplot(qc_design_Severe, x="Infection", y="purple", add="dotplot",
     theme(plot.title = element_text(hjust = 0.5))
 dev.off()
 
-##### Panel C: Venn diagram of DEGs for CoV and Severe vs uninfected #####
-# Draw Venn Diagram
-pdf("./IMAGES/Fig6c_DEG_Venn_Severe.pdf")
-vennDiagram(gene_sets_Severe[,c("CoV", "Severe")])
-dev.off()
+##### Panels E and F
+qc_design_Severe$ACE2    = unlist(vst["ACE2",qc_design_Severe$SubjectID])
+qc_design_Severe$IL6     = unlist(vst["IL6",qc_design_Severe$SubjectID])
+panel_genes = list(E="ACE2", F="IL6")
+for (panel in names(panel_genes)) {
+    gene = panel_genes[[panel]]
+    # Plot boxplot, with t-test values
+    pdf(sprintf("./IMAGES/Fig6%s_%s_byInfection_Severe.pdf", panel, gene), width=180/25.4/2, height=180/25.4/2)
+    g = ggboxplot(qc_design_Severe, x="Infection", y=gene, add="dotplot", 
+              add.params=list(binwidth=diff(range(qc_design_Severe[,gene]))/100, alpha=0.5), 
+              outlier.shape=NA, main=gene, ylab="VST Normalized Expression") +
+        annotate("text", x=1, y=max(qc_design_Severe[,gene])*1.1, size = 3,
+                 label="log2FC:\np-value:") +
+        annotate("text", x=3, y=max(qc_design_Severe[,gene])*1.1, size = 3,
+                 label=sprintf("%0.3f\n%0.1e", common_res_Severe[gene,'logFC_CoV'], common_res_Severe[gene,'adj.P.Val_CoV'])) +
+        annotate("text", x=2, y=max(qc_design_Severe[,gene])*1.1, size = 3,
+                 label=sprintf("%0.3f\n%0.1e", common_res_Severe[gene,'logFC_Severe'], common_res_Severe[gene,'adj.P.Val_Severe'])) +
+        theme(plot.title = element_text(hjust = 0.5))
+    print(g)
+    dev.off()
+}
 
 write.table(common_res_Severe[rownames(gene_sets_Severe[gene_sets_Severe$CoV == 1 & gene_sets_Severe$Severe == 1,]),], file="./OUTPUT/COV_Severe_Combined_DEGs.Common.noSample.txt", sep='\t', quote=F, col.names=NA)
 write.table(common_res_Severe[rownames(gene_sets_Severe[gene_sets_Severe$CoV == 1 & gene_sets_Severe$Severe == 0,]),], file="./OUTPUT/COV_Severe_Combined_DEGs.CoV_only.noSample.txt", sep='\t', quote=F, col.names=NA)
@@ -330,6 +362,58 @@ write.table(bothup_top_enrichr_Severe[, c("Term", "Adjusted.P.value", "Example G
 write.table(bothdn_top_enrichr_Severe[, c("Term", "Adjusted.P.value", "Example Genes", "Genes")], 
             file="./OUTPUT/bothdn_top_enrichr_Severe.txt", sep="\t", quote=F, col.names=T, row.names=F)
 
+#=================================================#
+# Figure 6 panel C, logFC of CoV vs. logFC of ORV #
+#=================================================#
+
+logFC_thresh = 0.5
+FDR_thresh = 0.05
+
+common_res_Severe = common_res_Severe[order(apply(common_res_Severe[,c('adj.P.Val_Severe','adj.P.Val_CoV')],1,mean), decreasing=T),]
+
+cov_sig_bool = common_res_Severe$adj.P.Val_CoV < FDR_thresh & abs(common_res_Severe$logFC_CoV) > logFC_thresh
+severe_sig_bool = common_res_Severe$adj.P.Val_Severe < FDR_thresh & abs(common_res_Severe$logFC_Severe) > logFC_thresh
+sig_degs = cov_sig_bool | severe_sig_bool
+significance = ifelse(cov_sig_bool & severe_sig_bool, 'Shared',
+                 ifelse(severe_sig_bool, 'ORV',
+                 ifelse(cov_sig_bool, 'CoV', 'Neither')))
+common_res_Severe$Sig_status = significance
+
+pdf(sprintf("./IMAGES/Fig6c_Severe_logFC_comp.pdf", FDR_thresh, logFC_thresh))
+r = cor.test(common_res_Severe$logFC_CoV[sig_degs], common_res_Severe$logFC_Severe[sig_degs])
+g = ggscatter(common_res_Severe, x='logFC_Severe', y='logFC_CoV', 
+              color="Sig_status", pal=c(CoV_color, neither_color, OTHER_color, both_color),
+              main=sprintf("R = %0.2f (p = %0.2e)", r$estimate, r$p.value)
+)
+print(g)
+dev.off()
+
+##### Use METASOFT to compare the logFC values #####
+
+common_genes = rownames(common_res_Severe[sig_degs,])
+metasoft_input = data.frame(
+name = common_genes,
+CoV_logFC = res_fit_CoV[common_genes, "logFC"],
+CoV_SE = (sqrt(fit_CoV$s2.post) * fit_CoV$stdev.unscaled)[common_genes, "InfectionCoronavirus"],
+Severe_logFC = res_fit_Severe[common_genes, "logFC"],
+Severe_SE = (sqrt(fit_Severe$s2.post) * fit_Severe$stdev.unscaled)[common_genes, "InfectionSevereVirus"],
+stringsAsFactors=F
+)
+
+write.table(metasoft_input, file=sprintf("./OUTPUT/Severe_v_CoV.MetasoftInput.%f.%f.txt", FDR_thresh, logFC_thresh), sep='\t', quote=F, col.names=F, row.names=F)
+
+system(sprintf("
+  module load metasoft
+  java -jar $METASOFT -input ./OUTPUT/Severe_v_CoV.MetasoftInput.%1$f.%2$f.txt -pvalue_table /software/cgeh/metasoft/default/install/HanEskinPvalueTable.txt -output ./OUTPUT/Severe_v_CoV.MetasoftOutput.%1$f.%2$f.txt -log ./OUTPUT/meta.log
+  ", FDR_thresh, logFC_thresh))
+
+meta_res = read.table(sprintf("./OUTPUT/Severe_v_CoV.MetasoftOutput.%f.%f.txt", FDR_thresh, logFC_thresh), skip=1, strings=F)
+colnames(meta_res) = c("GENE","NUM_STUDY","PVALUE_FE","BETA_FE","STD_FE","PVALUE_RE","BETA_RE","STD_RE","PVALUE_RE2","STAT1_RE2","STAT2_RE2","PVALUE_BE","I_SQUARE","Q","PVALUE_Q","TAU_SQUARE","STUDY1_P","STUDY2_P","STUDY1_M","STUDY2_M")
+meta_res_rmNA = meta_res[!is.na(meta_res$PVALUE_Q),]
+meta_res_rmNA$adjPVALUE_Q = p.adjust(meta_res_rmNA$PVALUE_Q, method="BH")
+meta_res_rmNA = meta_res_rmNA[order(meta_res_rmNA$PVALUE_Q),]
+write.table(meta_res_rmNA, file=sprintf("./OUTPUT/Severe_v_CoV.MetasoftOutput.%f.%f.txt", FDR_thresh, logFC_thresh), sep='\t', quote=F, col.names=T, row.names=F)
+
 #================#
 # Data Summaries #
 #================#
@@ -374,47 +458,6 @@ for (setName in names(genesets_Severe)) {
 }
 
 write.table(hypergeom_df_Severe, "./OUTPUT/CoV_Severe_DEG_WGCNA_enrichment.txt", sep="\t", quote=FALSE, row.names=FALSE)
-
-#=======================#
-# Supplemental figure 5 #
-#=======================#
-
-# Compare the logFC of genes in Severe+ vs COV+
-CoV_degs = rownames(res_fit_CoV[(res_fit_CoV$adj.P.Val < 0.05) & (abs(res_fit_CoV$logFC) > 0.5),])
-Severe_degs = rownames(res_fit_Severe[(res_fit_Severe$adj.P.Val < 0.05) & (abs(res_fit_Severe$logFC) > 0.5),])
-genes_Severe = intersect(rownames(res_fit_CoV), rownames(res_fit_Severe))
-all_degs_Severe = unique(c(CoV_degs, Severe_degs))
-common_degs_Severe = intersect(CoV_degs, Severe_degs)
-lesser_degs_Severe = unique(c(rownames(res_fit_CoV[(res_fit_CoV$adj.P.Val < 0.05) & (abs(res_fit_CoV$logFC) < 0.5),]), rownames(res_fit_Severe[(res_fit_Severe$adj.P.Val < 0.05) & (abs(res_fit_Severe$logFC) < 0.5),])))
-lesser_degs_Severe = lesser_degs_Severe[!(lesser_degs_Severe %in% all_degs_Severe)]
-all_degs_Severe = c(all_degs_Severe, lesser_degs_Severe)
-deg_assign_Severe = ifelse(genes_Severe %in% common_degs_Severe, "Both", ifelse(genes_Severe %in% CoV_degs, "CoV", ifelse(genes_Severe %in% Severe_degs,"Severe", "Neither")))
-
-all_deg_df_Severe = data.frame(
-    gene = genes_Severe,
-    sig_status = factor(deg_assign_Severe, levels=c("Neither", "Both", "Severe", "CoV")),
-    logFC_CoV = res_fit_CoV[genes_Severe, "logFC"],
-    AveExpr_CoV = res_fit_CoV[genes_Severe, "AveExpr"],
-    adj.P.Val_CoV = res_fit_CoV[genes_Severe, "adj.P.Val"],
-    logFC_Severe = res_fit_Severe[genes_Severe, "logFC"],
-    AveExpr_Severe = res_fit_Severe[genes_Severe, "AveExpr"],
-    adj.P.Val_Severe = res_fit_Severe[genes_Severe, "adj.P.Val"],
-    stringsAsFactors=FALSE
-    )
-rownames(all_deg_df_Severe) = all_deg_df_Severe$gene
-
-pdf("./IMAGES/SFig5_CoV_Severe_logFC.pdf")
-g = ggscatter(all_deg_df_Severe[order(all_deg_df_Severe$sig_status, decreasing=F),], x="logFC_Severe", y="logFC_CoV", shape = 21, fill=NA,
-          color="sig_status", palette=c(neither_color, both_color, OTHER_color, CoV_color),
-          xlab=expression(log[2]*"FC(Severe"^"+" ~"v. Cont)"), 
-          ylab=expression(log[2]*"FC(CoV"^"+" ~"v. Cont)"), 
-          )
-g = ggpar(g, legend.title = "Significant in:")
-print(g)
-dev.off()
-
-print(cor.test(all_deg_df_Severe[,"logFC_Severe"], all_deg_df_Severe[,"logFC_CoV"]))
-
 
 #================================#
 # Save session data to use later #
