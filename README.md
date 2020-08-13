@@ -1,9 +1,9 @@
 ---
 Title: "Type 2 and interferon inflammation strongly regulate SARS-CoV-2 related gene expression in the airway epithelium"
-Author: Satria P. Sajuthi, Peter DeFord
+Author: Satria P. Sajuthi, Peter DeFord, _et al_
 ---
 
-This repository contains scripts used to produce the figures within the paper "Type 2 and interferon inflammation strongly regulate SARS-CoV-2 related gene expression in the airway epithelium". They are organized as follow:
+This repository contains scripts used to produce the figures within the paper "Type 2 and interferon inflammation strongly regulate SARS-CoV-2 related gene expression in the airway epithelium" ([bioRxiv](https://doi.org/10.1101/2020.04.09.034454)). They are organized as follow:
 1. [Nasal airway epithelium brushing bulk RNA-seq analysis](#Nasal-airway-epithelium-brushing-bulk-RNA-seq-analysis).
 2. [Analysis of scRNA-seq data from the nasal epithelial brushing](#Analysis-of-scRNA-seq-data-from-the-nasal-epithelial-brushing).
 3. [Analysis of bulk RNA-seq data from IL-13 and HRV infected ALI nasal airway epithelial cultures](#Analysis-of-bulk-RNA-seq-data-from-IL-13-and-HRV-infected-ALI-nasal-airway-epithelial-cultures). 
